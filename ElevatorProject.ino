@@ -20,10 +20,10 @@ int delayInterval = 1000;
 int maxDelay = 2;
 int updateCount = 0;   // Execution count, so this doesn't run forever
 String command;
-String weatherCommand =  "curl \"http://weather.yahooapis.com/forecastrss?w=12761335&u=c\" | egrep -o pressure=\\\"[0-9]*\\.?[0-9]*\\\" | egrep -o \\\"[0-9]*\\.\\?[0-9]*\\\"";
+
 float currentAtmospherePressure = 101000;
-float minAltitude = 20;
-float maxAltitude = 20;
+float minAltitude = 25;
+float maxAltitude = 75;
 
 void setup() {
 
@@ -148,6 +148,7 @@ int readSignal() {
 
 void curlLatestWeather() {
   Process curl;
+  String weatherCommand =  "curl \"http://weather.yahooapis.com/forecastrss?w=12761335&u=c\" | egrep -o pressure=\\\"[0-9]*\\.?[0-9]*\\\" | egrep -o \\\"[0-9]*\\.\\?[0-9]*\\\"";
   curl.runShellCommand(weatherCommand);
   while (curl.running());
   String result;
