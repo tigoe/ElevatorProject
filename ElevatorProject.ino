@@ -24,8 +24,10 @@ int delayInterval = 1000;
 int maxDelay = 2;
 int updateCount = 0;   // Execution count, so this doesn't run forever
 String command;
-
-float currentAtmospherePressure = 0;
+String weatherCommand =  "curl \"http://weather.yahooapis.com/forecastrss?w=12761335&u=c\" | egrep -o pressure=\\\"[0-9]*\\.?[0-9]*\\\" | egrep -o \\\"[0-9]*\\.\\?[0-9]*\\\"";
+float currentAtmospherePressure = 101000;
+float minAltitude = 20;
+float maxAltitude = 20;
 
 void setup() {
 
@@ -34,10 +36,10 @@ void setup() {
   Serial.println("Starting...");
   Bridge.begin();
   Serial.println("Bridge started...");
-  
+
   //FIXME:do this on yun first time setup.
   Process p;
-  p.runShellCommand("date --set=\"2014-09-02 20:55:00\"");
+  p.runShellCommand("date --set=\"2014-08-07 17:37:00\"");
   while (p.running());
   // Read command output. runShellCommand() should have passed "Signal: xx&":
   while (p.available() > 0) {
@@ -56,49 +58,61 @@ void setup() {
 }
 
 void loop() {
-   
-  if(updateCount > maxDelay ){
-    getLatestWeather();
+
+  if (updateCount > maxDelay ) {
+    curlLatestWeather();
     updateCount = 0;
   }
   readPressure();
+  //  curlLatestWeather();
   delay(delayInterval);
   updateCount++;
-  
+
 }
 
-void readPressure(){
-    command = "curl -k \"https://dweet.io/dweet/for/tisch-elevator1?altitude=";
+void readPressure() {
 
-  Process curl;
-  Serial.print("Temperature = ");
-  Serial.print(bmp.readTemperature());
-  Serial.println(" *C");
-
-  Serial.print("Pressure = ");
-  Serial.print(bmp.readPressure());
-  Serial.println(" Pa");
+  //  Serial.print("Temperature = ");
+  //  Serial.print(bmp.readTemperature());
+  //  Serial.println(" *C");
+  //
+  //  Serial.print("Pressure = ");
+  //  Serial.print(bmp.readPressure());
+  //  Serial.println(" Pa");
 
   // Calculate altitude assuming 'standard' barometric
   // pressure of 1013.25 millibar = 101325 Pascal
-  Serial.print("Altitude = ");
-  Serial.print(bmp.readAltitude());
-  Serial.println(" meters");
+  //  Serial.print("Altitude = ");
+  //  Serial.print(bmp.readAltitude());
+  //  Serial.println(" meters");
+  //  Serial.print("Sea Level Pressure = ");
+  //  Serial.println(bmp.readSealevelPressure());
+  ////  Serial.println(" meters");
 
   // you can get a more precise measurement of altitude
   // if you know the current sea level pressure which will
   // vary with weather and such. If it is 1015 millibars
   // that is equal to 101500 Pascals.
+
+  Serial.print("Current Atmosphere Pressure = ");
+  Serial.println(currentAtmospherePressure);
+  float myAltitude = bmp.readAltitude(currentAtmospherePressure);
+
   Serial.print("Real altitude = ");
-  float myAltitude = bmp.readAltitude(101000);
   Serial.print(myAltitude);
   Serial.println(" meters");
-  int alt = bmp.readAltitude();
-  int thisFloor = map(alt, 10, 59, 1, 12);
+
+  // Recalibrate min and max
+  minAltitude = (myAltitude < minAltitude) ? myAltitude : minAltitude;
+  maxAltitude = (myAltitude > maxAltitude) ? myAltitude : maxAltitude;
+
+  int thisFloor = map(myAltitude, minAltitude, maxAltitude, 1, 12);
   Serial.print("floor: ");
   Serial.println(thisFloor);
 
-  command += alt;
+  Process curl;
+  command = "curl -k \"https://dweet.io/dweet/for/tisch-elevator1?altitude=";
+  command += myAltitude;
 
   int signal = readSignal();
   command += "&rssi=";
@@ -136,60 +150,22 @@ int readSignal() {
   return signalStrength;
 }
 
-void getLatestWeather(){
-    TembooChoreo GetWeatherByAddressChoreo;
-
-    // Invoke the Temboo client
-    GetWeatherByAddressChoreo.begin();
-    
-    // Set Temboo account credentials
-    GetWeatherByAddressChoreo.setAccountName(TEMBOO_ACCOUNT);
-    GetWeatherByAddressChoreo.setAppKeyName(TEMBOO_APP_KEY_NAME);
-    GetWeatherByAddressChoreo.setAppKey(TEMBOO_APP_KEY);
-    
-    // Set Choreo inputs
-    //using c to get pressure in millibars
-    GetWeatherByAddressChoreo.addInput("Units", "c");
-//        GetWeatherByAddressChoreo.addInput("Units", "f");
-    GetWeatherByAddressChoreo.addInput("Address", "721 Broadway, NY 10003");
-    
-    // Identify the Choreo to run
-    GetWeatherByAddressChoreo.setChoreo("/Library/Yahoo/Weather/GetWeatherByAddress");
-    GetWeatherByAddressChoreo.addOutputFilter("pressure", "/rss/channel/yweather:atmosphere/@pressure", "Response");
-
-    // Run the Choreo; when results are available, print them to serial
-    GetWeatherByAddressChoreo.run();
-    String responseString ="";
-    while(GetWeatherByAddressChoreo.available()) {
-        responseString += (char)GetWeatherByAddressChoreo.read();
-//      1 millibar =100 pascals
-    }
-//    Serial.print(responseString);
-   
-    String result = getValue(responseString,'\n',1);
-    result.trim();
-    Serial.print("CURRENT PRESSURE FROM YAHOO : ");
-    Serial.print(result);
-    Serial.println(" millibars");
-//    float f = 10; 
-//    f = atof(result.c_str());
-    GetWeatherByAddressChoreo.close();
-
-}
-
- String getValue(String data, char separator, int index)
-{
-  int found = 0;
-  int strIndex[] = {0, -1};
-  int maxIndex = data.length()-1;
-
-  for(int i=0; i<=maxIndex && found<=index; i++){
-    if(data.charAt(i)==separator || i==maxIndex){
-        found++;
-        strIndex[0] = strIndex[1]+1;
-        strIndex[1] = (i == maxIndex) ? i+1 : i;
+void curlLatestWeather() {
+  Process curl;
+  curl.runShellCommand(weatherCommand);
+  while (curl.running());
+  String result;
+  while (curl.available() > 0) {
+    char c = curl.read();
+    if (c != '\"') {
+      result += c;
     }
   }
-
-  return found>index ? data.substring(strIndex[0], strIndex[1]) : "";
+  Serial.print(result);
+  float x = result.toFloat();
+  //1 millibar =100 pascals
+  currentAtmospherePressure = x * 100;
+  Serial.print(" Updated currentAtmospherePressure : ");
+  Serial.println(currentAtmospherePressure);
+  Serial.println();
 }
