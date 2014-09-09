@@ -1,13 +1,5 @@
-#include <Adafruit_BMP085.h>
-#include <Wire.h>
-#include <Process.h>
-#include <Bridge.h>
-#include <Temboo.h>
-#include "TembooAccount.h" // contains Temboo account information, as described below
-
-
-
 /*
+
  Elevator Project
  created 18 Aug 2014
  by Tom Igoe
@@ -16,7 +8,11 @@
  Uses dweet.io as well.
 
 */
-//
+
+#include <Adafruit_BMP085.h>
+#include <Wire.h>
+#include <Process.h>
+#include <Bridge.h>
 
 Adafruit_BMP085 bmp;
 int lastFloor = 0;
